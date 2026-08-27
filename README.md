@@ -15,7 +15,7 @@ pnpm dev
 
 1. 将仓库推送到 GitHub。
 2. 在 Railway 创建项目并选择 Deploy from GitHub repo。
-3. 在 Variables 中填入 `.env.example` 中的变量，至少配置 `DEEPSEEK_API_KEY` 和 `ARK_API_KEY`。
+3. 在 Variables 中填入 `.env.example` 中的变量，至少配置 `DEEPSEEK_API_KEY`、`ARK_LITE_API_KEY` 和 `ARK_PRO_API_KEY`。如果两个豆包模型共用密钥，也可以只配置 `ARK_API_KEY`。
 4. 生成公开域名。
 
 API Key 仅由服务端读取。参考图片在浏览器转为 Data URL 后直接发送给豆包，不写入服务器磁盘。
