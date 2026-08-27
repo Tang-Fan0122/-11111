@@ -23,8 +23,13 @@ export async function POST(request: NextRequest) {
     if (!image || typeof image !== "string" || !image.startsWith("data:image/")) {
       return NextResponse.json({ error: "没有收到有效的参考图片" }, { status: 400 });
     }
-    const apiKey = process.env.ARK_API_KEY;
-    if (!apiKey) return NextResponse.json({ error: "请先在 Railway Variables 中配置 ARK_API_KEY" }, { status: 503 });
+    const apiKey = quality === "pro"
+      ? (process.env.ARK_PRO_API_KEY || process.env.ARK_API_KEY)
+      : (process.env.ARK_LITE_API_KEY || process.env.ARK_API_KEY);
+    if (!apiKey) {
+      const variable = quality === "pro" ? "ARK_PRO_API_KEY" : "ARK_LITE_API_KEY";
+      return NextResponse.json({ error: `请先在 Railway Variables 中配置 ${variable}` }, { status: 503 });
+    }
     const model = quality === "pro"
       ? (process.env.DOUBAO_PRO_MODEL || "doubao-seed-2-0-pro-260215")
       : (process.env.DOUBAO_MODEL || "doubao-seed-2-0-lite-260215");
