@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import "./workflow.css";
 import "./branches.css";
-import "./compact-canvas.css";
+import "./flow-layout.css";
 
 export const metadata: Metadata = {
   title: "幕间 · AI 剧本与分镜工作台",

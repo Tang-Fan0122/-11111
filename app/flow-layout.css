@@ -1,0 +1,10 @@
+/* 根据选择的线路，把当前工作节点放在选择卡片旁，避免首屏出现大面积空白。 */
+.split-world .brief-node{top:160px!important}
+.split-world .analysis-node{top:520px!important}
+.split-world .story-node{left:560px!important;top:35px!important}
+.split-world .shots-node{left:1080px!important;top:35px!important}
+.split-world .prompt-node{left:1800px!important;top:35px!important}
+.split-world .branch-atmosphere{top:480px}
+.split-world:has(.analysis-node:not(.disabled-node)) .story-node{left:1160px!important;top:520px!important}
+.split-world:has(.analysis-node:not(.disabled-node)) .shots-node{left:1760px!important;top:520px!important}
+.split-world:has(.analysis-node:not(.disabled-node)) .prompt-node{left:2540px!important;top:520px!important}
