@@ -1,0 +1,5 @@
+.split-world .brief-node{top:260px!important}
+.split-world .analysis-node{top:635px!important}
+.split-world:has(.analysis-node:not(.disabled-node)) .story-node,.split-world:has(.analysis-node:not(.disabled-node)) .shots-node,.split-world:has(.analysis-node:not(.disabled-node)) .prompt-node{top:635px!important}
+.split-world .wires path{fill:none;stroke:#d8d1c7;stroke-width:2;stroke-dasharray:5 8;transition:.25s ease}.split-world .wires path.active-wire{stroke:#ce6c3f;stroke-width:3;stroke-dasharray:none;filter:drop-shadow(0 0 4px rgba(206,108,63,.25))}.split-world .wires path.muted-wire{opacity:.42}
+.branch-label{position:absolute;left:560px;font-size:13px;font-weight:700;letter-spacing:.04em;color:#a69f94;z-index:2}.branch-narrative{top:0}.branch-atmosphere{top:600px}.branch-label.selected-branch{color:#b85c33}
