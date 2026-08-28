@@ -17,7 +17,15 @@ videoPrompt：按镜头时长拆成0-3秒、3-6秒等时间段；每段必须包
 negativePrompt：针对本镜具体约束人物面部、发型、年龄、体型、服装；产品外形、颜色、材质、比例、Logo位置、包装；场景结构、道具位置、光向、轴线。禁止身份漂移、产品变形、文字变形、增删对象、手指异常、穿模、闪烁、跳帧和背景漂移。
 仅输出合法JSON：{"prompts":[{"id":"01","imagePrompt":"中文详细分镜图提示词","videoPrompt":"中文分时间段运动提示词","negativePrompt":"中文连续性与禁止项"}]}`;
 
-async function ask(system: string, payload: unknown) {
+function tokenBudget(phase: string) {
+  const custom = Number(process.env.DEEPSEEK_MAX_TOKENS);
+  if (custom) return custom;
+  if (phase === "story") return 5500;
+  if (phase === "shots") return 7500;
+  return 11000;
+}
+
+async function ask(system: string, payload: unknown, phase: string) {
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) throw new Error("请先在 Railway Variables 中配置 DEEPSEEK_API_KEY");
   const base = (process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com").replace(/\/$/, "");
@@ -25,10 +33,17 @@ async function ask(system: string, payload: unknown) {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
-      model: process.env.DEEPSEEK_MODEL || "deepseek-v4-pro",
+      // 剧本创作要做人物弧和因果推理，使用深度模型；分镜/提示词使用快速模型提升体验。
+      model: phase === "story"
+        ? (process.env.DEEPSEEK_DEEP_MODEL || process.env.DEEPSEEK_MODEL || "deepseek-v4-pro")
+        : (process.env.DEEPSEEK_FAST_MODEL || "deepseek-v4-flash"),
       messages: [{ role: "system", content: system }, { role: "user", content: JSON.stringify(payload, null, 2) }],
-      response_format: { type: "json_object" }, max_tokens: Number(process.env.DEEPSEEK_MAX_TOKENS || 24000),
-      thinking: { type: "enabled" }, reasoning_effort: "high",
+      response_format: { type: "json_object" }, max_tokens: tokenBudget(phase),
+      // 仅剧本阶段开启思考；后续结构化生产阶段关闭，以减少等待。
+      thinking: { type: phase === "story" ? "enabled" : "disabled" },
+      reasoning_effort: phase === "story"
+        ? (process.env.DEEPSEEK_DEEP_REASONING_EFFORT || "medium")
+        : (process.env.DEEPSEEK_FAST_REASONING_EFFORT || "low"),
     }), signal: AbortSignal.timeout(240000),
   });
   const data = await response.json();
@@ -56,18 +71,18 @@ export async function POST(request: NextRequest) {
     const input = await request.json();
     if (input.phase === "story") {
       if (!input.idea?.trim()) return NextResponse.json({ error: "请先填写创意" }, { status: 400 });
-      return NextResponse.json({ story: await ask(STORY_PROMPT, input) });
+      return NextResponse.json({ story: await ask(STORY_PROMPT, input, "story") });
     }
     if (input.phase === "shots") {
       if (!input.story) return NextResponse.json({ error: "请先确认故事" }, { status: 400 });
-      const storyboard = await ask(SHOT_PROMPT, input);
+      const storyboard = await ask(SHOT_PROMPT, input, "shots");
       storyboard.shots = fitDurations(Array.isArray(storyboard.shots) ? storyboard.shots : [], Number(input.targetSeconds));
       storyboard.actualSeconds = storyboard.shots.reduce((sum:number, s:{duration:string}) => sum + (Number.parseInt(s.duration) || 0), 0);
       return NextResponse.json({ storyboard });
     }
     if (input.phase === "prompts") {
       if (!input.shots?.length) return NextResponse.json({ error: "请先确认分镜" }, { status: 400 });
-      return NextResponse.json({ promptSet: await ask(PROMPT_PROMPT, input) });
+      return NextResponse.json({ promptSet: await ask(PROMPT_PROMPT, input, "prompts") });
     }
     return NextResponse.json({ error: "未知生成阶段" }, { status: 400 });
   } catch (error) {
