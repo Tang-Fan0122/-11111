@@ -8,6 +8,7 @@ const STORY_PROMPT = `你是一位经验丰富的职业影视编剧。此阶段�
 仅输出合法JSON：{"title":"片名","genre":"类型","theme":"主题命题","logline":"高概念一句话","characters":[{"name":"姓名","identity":"身份与固定外貌","desire":"外在目标","need":"内在需求","flaw":"缺陷","arc":"人物弧"}],"world":"时空与规则","openingHook":"前三秒/开场钩子","synopsis":"完整故事梗概","beats":[{"name":"节拍名称","content":"具体发生什么、因果和人物选择","emotion":"观众情绪"}],"climax":"高潮与关键选择","ending":"结局与余韵","continuityBible":"人物、产品、道具、场景必须保持的固定信息"}`;
 
 const SHOT_PROMPT = `你是一位专业导演和分镜师。只能根据已经确认的故事拆解镜头，不得擅自修改人物动机、关键情节和结局。镜头需要具备清晰的空间轴线、动作衔接、信息递进和节奏变化；复杂动作必须拆镜。镜头时长总和应接近目标片长。
+用户会提供 targetSeconds。所有镜头 duration 的秒数相加必须严格等于 targetSeconds，输出前必须自行计算校验。
 此阶段不要生成生图或视频提示词。仅输出合法JSON：{"shots":[{"id":"01","duration":"6s","beat":"对应故事节拍","shotSize":"景别","visual":"具体可拍摄画面，人物、动作、道具和空间关系","lighting":"光影与色调","dialogue":"对白或旁白，无则—","sound":"环境声、音乐、动作音效","camera":"机位、焦段、构图、起止状态和运镜","purpose":"该镜的叙事/情绪功能","continuity":"此镜必须保持的身份、产品、道具、场景连续性"}]}`;
 
 const PROMPT_PROMPT = `你是一位生成式影像提示词导演。只能为已经确认的镜头生成提示词，不得改写剧情、增删人物、产品、道具或事件。全部使用中文，每一镜必须独立完整。
@@ -37,6 +38,19 @@ async function ask(system: string, payload: unknown) {
   try { return JSON.parse(content); } catch { throw new Error("模型返回内容不完整，请重新生成"); }
 }
 
+function fitDurations(shots: Array<Record<string, unknown>>, target: number) {
+  if (!shots.length || !Number.isFinite(target) || target < 1) return shots;
+  const raw = shots.map(s => Math.max(1, Number.parseFloat(String(s.duration || "0")) || 1));
+  const total = raw.reduce((a,b)=>a+b,0);
+  const values = raw.map(v => Math.max(1, Math.floor(v / total * target)));
+  let diff = target - values.reduce((a,b)=>a+b,0);
+  let index = 0;
+  while (diff > 0) { values[index % values.length]++; diff--; index++; }
+  index = values.length - 1;
+  while (diff < 0 && values.some(v=>v>1)) { if (values[index] > 1) { values[index]--; diff++; } index = (index - 1 + values.length) % values.length; }
+  return shots.map((shot,i)=>({ ...shot, duration:`${values[i]}s` }));
+}
+
 export async function POST(request: NextRequest) {
   try {
     const input = await request.json();
@@ -46,7 +60,10 @@ export async function POST(request: NextRequest) {
     }
     if (input.phase === "shots") {
       if (!input.story) return NextResponse.json({ error: "请先确认故事" }, { status: 400 });
-      return NextResponse.json({ storyboard: await ask(SHOT_PROMPT, input) });
+      const storyboard = await ask(SHOT_PROMPT, input);
+      storyboard.shots = fitDurations(Array.isArray(storyboard.shots) ? storyboard.shots : [], Number(input.targetSeconds));
+      storyboard.actualSeconds = storyboard.shots.reduce((sum:number, s:{duration:string}) => sum + (Number.parseInt(s.duration) || 0), 0);
+      return NextResponse.json({ storyboard });
     }
     if (input.phase === "prompts") {
       if (!input.shots?.length) return NextResponse.json({ error: "请先确认分镜" }, { status: 400 });

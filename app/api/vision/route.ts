@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
-const VISION_PROMPT = `你是一位电影摄影指导、选角造型师和视觉连续性监督。分析用户上传的参考画面，仅输出中文 JSON，不要 Markdown。必须客观区分可见事实与推测。输出：
+const VISION_PROMPT = `你是一位电影摄影指导、剪辑师和视觉风格分析师。用户可能上传一张图片，或从一段视频中按时间抽取的多张连续画面。仅输出中文 JSON，不要 Markdown。必须客观区分可见事实与推测。如果是多张连续帧，需要拆解镜头变化、主体运动、镜头运动、剪辑节奏与风格规律。输出：
 {
   "summary":"一句话画面摘要",
+  "source_type":"图片/视频抽帧",
+  "shot_breakdown":[{"range":"画面序号或时间段","content":"镜头内容","camera_motion":"镜头运动","subject_motion":"主体运动","transition":"转场或剪辑"}],
   "subjects":[{"identity":"人物/主体","appearance":"可见外貌","wardrobe":"服装配饰","pose_expression":"动作表情"}],
   "environment":{"location":"","era":"","weather":"","set_details":[]},
   "cinematography":{"shot_size":"","angle":"","composition":"","lens_estimate":"","depth_of_field":"","camera_height":""},
@@ -19,9 +21,10 @@ const VISION_PROMPT = `你是一位电影摄影指导、选角造型师和视觉
 
 export async function POST(request: NextRequest) {
   try {
-    const { image, quality = "lite" } = await request.json();
-    if (!image || typeof image !== "string" || !image.startsWith("data:image/")) {
-      return NextResponse.json({ error: "没有收到有效的参考图片" }, { status: 400 });
+    const { image, images, quality = "lite", sourceType = "image" } = await request.json();
+    const frames = Array.isArray(images) ? images : image ? [image] : [];
+    if (!frames.length || frames.some((item:string) => typeof item !== "string" || !item.startsWith("data:image/"))) {
+      return NextResponse.json({ error: "没有收到有效的参考画面" }, { status: 400 });
     }
     const apiKey = quality === "pro"
       ? (process.env.ARK_PRO_API_KEY || process.env.ARK_API_KEY)
@@ -40,7 +43,7 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({
         model,
         reasoning_effort: quality === "pro" ? "medium" : "minimal",
-        messages: [{ role: "user", content: [{ type: "image_url", image_url: { url: image } }, { type: "text", text: VISION_PROMPT }] }],
+        messages: [{ role: "user", content: [...frames.slice(0, 8).map((url:string) => ({ type: "image_url", image_url: { url } })), { type: "text", text: `${VISION_PROMPT}\n素材类型：${sourceType === "video" ? "视频抽帧，画面按时间先后排列" : "单张图片"}` }] }],
       }),
       signal: AbortSignal.timeout(120000),
     });
