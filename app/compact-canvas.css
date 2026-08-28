@@ -1,0 +1,6 @@
+/* 首屏优先展示流程节点；需要查看长文本时仍可拖动画布。 */
+.split-world{zoom:.72}
+.split-world .brief-node{box-shadow:0 16px 42px rgba(199,94,51,.14)}
+.split-world .empty{min-height:150px;background:linear-gradient(135deg,#fffdf9,#faf5ee);border:1px dashed #e5c5b3;border-radius:8px;padding:18px}
+.split-world .empty>span{font-size:30px;color:#e37a50}.split-world .empty p{font-weight:600;color:#746c63}
+.split-world .branch-label{padding:7px 11px;background:#f4f2ed;border:1px solid #e4ddd4;border-radius:999px}
